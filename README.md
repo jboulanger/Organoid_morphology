@@ -5,21 +5,25 @@ This repository contains an ImageJ 1 macro that analyses the morphology of brain
 ![B8-kit-day18-2](https://github.com/jboulanger/Organoid_morphology/assets/3415561/1be0f509-007b-4457-966d-0f7a09be3281)
 
 The segmented contour is analyzed to extract several parameters: 
-- Area
-- Perimeter
-- Average Radius
-- Roundess
-- Aspect Ratio
-- Feret
-- min Feret
-- Circularity
-- number of inflection points
-- sum of weighted curvature
-- DNE
-- estimated transparency
-- mean of the curvature
-- standard deviation of the curvature
-- Average radius time the standard deviation of the curvature.
+- Area [um^2]: Area of the selection in um^2 ("Area" measurement)
+- Perimeter [um]: Perimeter of the selection ("Perim." measurement)
+- Average Radius [um]: Average distance R0 of the contour to the center of the selection
+- Roundess: 4 x [Area/π (Major axis)2] ("Round" measurement) 
+- Aspect Ratio: Major axis / Minor axis of the fitted ellipse ("AR" measurement)
+- Feret [um]: the longest distance between any two points along the selection boundary ("Feret" Measurement)
+- Min Feret [um]: the minimum distance between any two points along the selection boundary ("MinFeret" Measurement)
+- Circularity: 4π x (Area/Perimeter^2) ("Circ." Measurement)
+- Inflection points: number of detected inflection points 
+- Weighted curvature [um^-1] : Logarithm of the sum of the curvature x segment length
+- DNE: logarithm of the square of the variation of the normal n=(dy,-dx) of the contour projected on its tangent t=(dx,dy) where dx and dy are the first derivative in x and y40,41. DNE is normalised by the average radius (R0).
+- Transparency: the mean response of the Laplacian of Gaussian (LoG) filter.
+- Mean curvature [um^-1]: Average of the curvature along the contour
+- Std curvature: Standard deviation of the curvature along the contour
+- R0 x Std curvature: standard deviation of the logarithm of the sum of the square of the curvature of the contour normalized by the average radius (R0)
+
+The curvature along the contour is the inverse of the radius of the osculating circle and is computed as [(dx * dyy) – (dy * dxx)] / [(dx^2) + (dy^2)]^3/2 where dx and dy are the first derivative in x and y and dxx and dyy are the second derivative of the contour. The curvature is computed with a [geometric approach](https://scholar.rose-hulman.edu/cgi/viewcontent.cgi?article=1233&context=rhumj) using Heron's formula.
+
+
 
 ## Installation
 Download the macro [Organoid_Morphology.ijm](https://raw.githubusercontent.com/jboulanger/Organoid_morphology/main/Organoid_Morphology.ijm).
