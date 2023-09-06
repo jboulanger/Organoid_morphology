@@ -14,7 +14,7 @@ The segmented contour is analyzed to extract several parameters:
 - Min Feret [um]: the minimum distance between any two points along the selection boundary ("MinFeret" Measurement)
 - Circularity: 4π x (Area/Perimeter^2) ("Circ." Measurement)
 - Inflection points: number of detected inflection points 
-- Weighted curvature [um^-1] : Logarithm of the sum of the curvature x segment length
+- Weighted curvature [um^-1] : Logarithm of the sum of the squared curvature x segment length
 - DNE: logarithm of the square of the variation of the normal n=(dy,-dx) of the contour projected on its tangent t=(dx,dy) where dx and dy are the first derivative in x and y. DNE is normalised by the average radius (R0).
 - Transparency: the mean response of the Laplacian of Gaussian (LoG) filter.
 - Mean curvature [um^-1]: Average of the curvature along the contour
