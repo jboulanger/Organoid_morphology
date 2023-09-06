@@ -1,4 +1,6 @@
+
 # Organoid Morphology
+[![DOI](https://zenodo.org/badge/687934497.svg)](https://zenodo.org/badge/latestdoi/687934497)
 
 This repository contains an ImageJ 1 macro that analyses the morphology of brain organoids slices acquired in brightfiled microscopy.
 
