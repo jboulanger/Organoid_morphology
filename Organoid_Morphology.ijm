@@ -7,6 +7,7 @@
 #@Float(label="Colorbar max", value = 0.05) colorbarmax
 #@Boolean(label="Save image as jpg and close", value=true) finalclear
 #@Boolean(label="Save ROI", value=true) saveroi
+#@File(label="Output folder",style="directory") output_folder
 #@Boolean(label="Used saved ROI", value=false) useSavedROI
 #@Float(label="Marker scale", value=4) markerscale
 
@@ -38,27 +39,7 @@
  * 
  * Jerome Boulanger for Ilaria (2020)
  * 
- * #@File(label="Weka Segmentation model") wekamodel
  */
-
-//
-if (endsWith(filename,".tif")) {
-	run("Close All");
-	run("Set Measurements...", "  redirect=None decimal=10");
-	closeWindow("ROI Manager");
-	print("+----------------------0_0---------------------------+");
-	print(filename);
-	folder = File.getDirectory(filename);
-	fname = File.getName(filename);
-	tbl = "Organoid Morphology";
-	n = initTable(tbl);
-	processFile(n, folder, fname, tbl);
-	wait(500);
-	run("Collect Garbage");
-} else {
-	print(filename);
-	print("Not a tif file, skip");	
-}
 
 function manualBatchProcess() {
 	// process a folder containing tif files
@@ -84,9 +65,10 @@ function initTable(tblname) {
 
 function processFile(idx, folder, fname, tblname) {
 	// open and process file
+	
 	setBatchMode("hide");	
-	print("Processing " + fname);
-	roifilename = replace(folder+File.separator+fname,".tif",".roi");
+	
+	roifilename = folder + File.separator + replace(fname, ".tif", ".roi");
 	
 	open(folder + File.separator + fname);
 	id = getImageID();
@@ -129,10 +111,7 @@ function processFile(idx, folder, fname, tblname) {
 				roiManager("add");
 				run("32-bit");
 			}
-		} else {		
-			run("32-bit");
-			id = getImageID();
-			print("segmenting image " + id);
+		} else {						
 			segment(id);
 		}
 	}
@@ -143,13 +122,13 @@ function processFile(idx, folder, fname, tblname) {
  		print("************");
 		return 0;
 	}
+	
 	// Compute curvature
-	roiManager("select", 0);	
-	//Roi.getSplineAnchors(x, y);
-	//run("Fit Spline");
-	//run("Interpolate", "interval=2 smooth adjust");	
+	roiManager("select", 0);		
 	Roi.getCoordinates(x, y);
 	run("Select None");
+	
+	
 		
 	// compute the length along the contour in micron
 	length = getCurvilinearLength(x,y,pixel_size);
@@ -217,8 +196,9 @@ function processFile(idx, folder, fname, tblname) {
  	Table.set("R0 x Std curvature", idx,R0*Cstd);
  	//Table.set("Intensity outside", idx, I0);
  	 
- 	//roiManager("select", 0);
- 	run("Select None");
+ 	roiManager("select", 0);
+ 	//run("Select None");
+ 	
  	// Overlays
 	if (matches(overlaytype,"DNE")) {
 		colorContour(x,y,dnd,markerscale);
@@ -232,7 +212,7 @@ function processFile(idx, folder, fname, tblname) {
 		}
 	}
 		
-	// drawing the inflection poinrs as red circles
+	// drawing the inflection points as red circles
 	setColor("red");
 	for (i = 0; i < K; i++) {
 		Overlay.drawEllipse(x[inflex[i]]-markerscale, y[inflex[i]]-markerscale,2*markerscale, 2*markerscale);		
@@ -252,7 +232,7 @@ function processFile(idx, folder, fname, tblname) {
  	selectImage(id);
  	run("Select None");
  	if (finalclear) { 
- 		ofilename = replace(folder+File.separator+fname,".tif",".jpg");
+ 		ofilename = output_folder + File.separator + replace(fname,".tif",".jpg");
  		print("Saving file \n" + ofilename);
  		saveAs("Jpeg", ofilename);
  		close(); 
@@ -260,25 +240,22 @@ function processFile(idx, folder, fname, tblname) {
  	
  	if (saveroi) {
  		if (roiManager("count") == 1) {  		
- 		print("Saving file \n" + roifilename);
- 		roiManager("select", 0);
- 		roiManager("Save", roifilename);
+ 			ofilename = output_folder + File.separator + replace(fname,".tif",".roi");
+	 		print("Saving file \n" + ofilename);
+	 		roiManager("select", 0);
+	 		roiManager("Save", ofilename);
  		} else {
  			print("There are more than one ROI.. cannot save it as .roi file.");
  		}
  	}
- 	 	
- 	run("Select None");
+ 	 	 	
  	closeRoiManager();
  	run("Select None");
- 	setBatchMode("exit and display");
- 	print("Done");
+ 	setBatchMode("exit and display"); 	
 }
 
-
-
 function fixContourOrientation() {
-	// re-orient the contour so that the normal
+	// re-orient the contour so that the normal points outwa	
 	Roi.getCoordinates(x, y);
 	Array.getStatistics(x, min, max, xc, stdDev);
 	Array.getStatistics(y, min, max, yc, stdDev);
@@ -299,18 +276,15 @@ function fixContourOrientation() {
 		ry /= r;
 		if (n > 0 && r > 0) {
 			dp += nx*rx+ny*ry;		
-		}
-		
-	}
-	dp /= x.length;
-	print("Contour orientation " + dp);
+		}		
+	}	
+	dp /= x.length;	
 	if (dp > 0) {
-		print("Fix orientation");
+		print("Fix contour orientation ("+dp+")");
 		Array.reverse(x);
 		Array.reverse(y);
 		Roi.setPolygonSplineAnchors(x, y);			
 	}
-	
 }
 
 function fixNaN(array) {
@@ -350,151 +324,236 @@ function addColorBar(values) {
 		Overlay.drawString(str, W-3*fs-5, (H+h)/2-i/(nticks-1)*h);
 	}
 	Overlay.show();
-	selectImage(cb);close();
-	
+	selectImage(cb);close();	
 }
 
 function segment(id) {
-	preprocess(id);	
-	//makeOval(584, 296, 183, 203);
-	//roiManager("add");
-	fitContour(id);
-	//roiManager("select", 0);
-	//roiFftSmooth(0.1);
-	roiManager("show none");
+	/* Segment the organoid in the image*/
+	removeScaleBar(id);
+	preprocessed_id = preprocess2(id);		
+	fitContour(preprocessed_id, 1000);	
+	selectImage(preprocessed_id); close();	
+	//roiManager("select", 0);	
+	//roiManager("show none");
+	//run("Select None");
+}
+
+function removeScaleBar(id) {
+	/* Remove the scalebar that was saved onto the image pixels */
+	selectImage(id);
 	run("Select None");
+	a0 = getValue("Area");
+	setThreshold(255, 255);	
+	run("Create Selection");
+	if (getValue("Area")!=a0) {
+		if (getValue("Area") != getWidth() * getHeight()) {
+			run("Enlarge...", "enlarge=2");
+			run("Median...", "radius=10");
+			run("Select None");
+		}
+	}
 }
 
 function correctBackground() {
-	run("Duplicate...","title=a");	
-	run("32-bit");
-	run("Median...", "radius=10");
-	a = getImageID();
-	run("Duplicate...","title=b");	
-	b = getImageID();
-	w = getWidth();
-	h = getHeight();
-	run("Size...", "width="+(w/8)+" height="+(h/8)+" depth=1 constrain average interpolation=Bilinear");
-	run("Median...", "radius=10");
-	for (i=0;i<10;i++) {
-		run("Maximum...", "radius=5");
-		run("Median...", "radius=5");
-		run("Minimum...", "radius=5");
-	}	
-	run("Size...", "width="+(w)+" height="+(h)+" depth=1 constrain average interpolation=Bilinear");
-	imageCalculator("Subtract", a, b);
-	selectImage(b);close();
-	selectImage(a);	
-	return a;
-}
-
-
-function preprocess(id) {	
-	/* Preprocess the image (32-bit) and populate the roi manager */
-				
-	selectImage(id);
-	Overlay.remove();
-	
-	// smooth the image
-	run("Duplicate...","title=tmp");
-	run("32-bit");
-	a = getImageID();	
-	// remove the scale bar (!!)
-	removeScaleBar();
-	if (getValue("Mode") < getValue("Mean")) {
-		print("Inverse");
-		run("Invert");
-	}	
-	run("Median...", "radius=5");
-	run("Find Edges");
-	run("Median...", "radius=5");
-	//for (i = 0; i < 10; i++) { run("Smooth"); }
-	run("Invert");	
-	// create ROI	
-	getStatistics(area, mean, min, max, std, histogram);
-	setThreshold(min,mean-std);
-	run("Convert to Mask");	
-	for (i=0;i<20;i++) {
-		run("Maximum...", "radius=10");
-		run("Median...", "radius=10");
-		run("Minimum...", "radius=10");
-	}	
-	run("Invert");
-	
-	run("Analyze Particles...", "size=100-Infinity exclude add");
+	id0 = getImageID();
 	run("Select None");
-	// clean up	images
-	selectImage(a);close();	
-	selectImage(id);	
-	keepLargestROI();	
-	//roiFftSmooth(1);
-	Overlay.remove();
-	roiManager("select", 0);	
-}
-
-function preprocess2(id) {
-	selectImage(id);
-	run("Duplicate...","title=tmp");
-	id1  =getImageID();
-	setAutoThreshold("Default");
-	run("Analyze Particles...", "size=100-Infinity add");
-	resetThreshold();
-	keepLargestROI();
-	run("Interpolate", "interval=10 smooth adjust");	
-}
-
-function fitContour(id) {
-	/*Fit the contours of the image id, update the ROI manager*/	
-	selectImage(id);
-	
-	// create a contour image	
-	run("Select None");
-	run("Duplicate...","title=tmp2");	
-	removeScaleBar();
-	if (getValue("Mode") < getValue("Mean")){
-		run("Invert");
-	}
-	run("32-bit");
-	run("Gaussian Blur...", "sigma=1");
-	for (iter=0;iter<5;iter++) {		
-		run("Median...", "radius=5");		
-	}	
-	run("Find Edges");	
-	for (iter=0;iter<5;iter++) {		
-		run("Median...", "radius=1");		
-	}	
-	saveAs("TIFF", "/home/jeromeb/Desktop/tmp2.tif");
-	getStatistics(area, mean, min, Imax, std, histogram);
-	run("Min...", "value="+(mean));
-	
+	run("32-bit");	
+	run("Duplicate...", " ");
 	id1 = getImageID();
-	
-	initROI(id);
-		
-	selectImage(id1);
-	roiManager("select",0);
-	//run("Interpolate", "interval="+50+"  smooth adjust");
-	run("Interpolate", "interval="+10+"  smooth adjust");
-	Roi.getSplineAnchors(x, y);	
-	
-	delta=1;
-	showStatus("Optimizing contour");
-	niter = 1000;
-	for (iter = 0; iter < niter && delta > 0.1; iter++) {
-		showProgress(iter, niter);
-		delta = gradTheCurve(x,y,10+80*exp(-iter/10),Imax);	
-		fftSmooth(x,y,1);				
-	}
-	print("niter:"+niter);
-	roiManager("select",0);
-	x = Array.reverse(x);
-	y = Array.reverse(y);
-	Roi.setPolygonSplineAnchors(x, y);		
-	roiManager("update");
+	getDimensions(width, height, channels, slices, frames);
+	run("Size...", "width="+width/8+" height="+height/8+" depth=1 constrain average interpolation=Bilinear");
+	run("Maximum...", "radius=30");
+	run("Gaussian Blur...", "sigma=10");
+	run("Size...", "width="+width+" height="+height+" depth=1 constrain average interpolation=Bilinear");
+	imageCalculator("subtract", id0, id1);
 	selectImage(id1);close();
+	selectImage(id0);
+}
+
+function preprocess1(id) {	
+	/* Provide an initial mask guess */
+	print("Preprocessing");
 	selectImage(id);
+	Overlay.remove();	
 	run("Select None");
+	getPixelSize(unit, dx, dy);
+	run("Duplicate...","title=preprocessed");
+	preprocessed_id = getImageID();		
+	run("32-bit");
 	
+	correctBackground();
+	for (i = 0; i < 10; i++) {
+		run("Minimum...", "radius="+r1);	
+		run("Median...",  "radius="+r1);
+		run("Maximum...", "radius="+r1);
+	}
+
+	selectImage(preprocessed_id);
+	run("Duplicate...","title=mask");	
+	mask_id = getImageID();
+	setAutoThreshold("Li");	
+	run("Convert to Mask");		
+	r2 = maxOf(1, round(100/dx));	
+	run("Minimum...", "radius="+r2);				
+	run("Maximum...", "radius="+r2);	
+	run("Analyze Particles...", "size=100-Infinity add");
+	keepLargestROI();
+	roiManager("select",0);
+	fixContourOrientation();	
+	roiManager("add");
+	roiManager("select", 0);
+	roiManager("delete");	
+	selectImage(mask_id); close();	
+	selectImage(preprocessed_id);
+	run("Find Edges");
+	run("Subtract...", "value=30");
+	run("Min...", "value=0");
+	return preprocessed_id;
+}
+
+function preprocess2(id) {	
+	/* Provide an initial mask guess using a contour based approach 
+	
+	- Add the ROI to the ROI Manager
+	- Return the id of the edge image
+	*/
+	print("Preprocessing");
+	selectImage(id);
+	closeRoiManager();
+	Overlay.remove();	
+	run("Select None");
+	run("Duplicate...","title=preprocessed");
+	preprocessed_id = getImageID();				
+	run("32-bit");
+	
+	getPixelSize(unit, dx, dy);
+	r1 = maxOf(1, round(15/dx));		
+	for (i = 0; i < 10; i++) {
+		run("Maximum...", "radius="+r1);	
+		run("Median...", "radius="+r1);
+		run("Minimum...", "radius="+r1);
+		run("Gaussian Blur...", "sigma=1");	
+	}		
+	run("Invert");
+	idx = getImageID();
+	run("Duplicate...","title=edges");
+	edges = getImageID();
+	run("Find Edges");
+	imageCalculator("Multiply", preprocessed_id, edges);
+	selectImage(edges); close();
+	
+	selectImage(preprocessed_id);	
+	run("Duplicate...","title=mask");	
+	mask_id = getImageID();
+	//EMThreshold();
+	getStatistics(area, mean, min, max, std, histogram);
+	setThreshold(mean+std, max+1);
+	//setAutoThreshold("Otsu");
+	run("Convert to Mask");		
+	
+	// close gaps in the contour and fill holes
+	getPixelSize(unit, dx, dy);
+	r2 = maxOf(1, round(10/dx));
+	for (i = 0; i < 10; i++) {
+		run("Maximum...", "radius="+r2);	
+		run("Median...", "radius="+r2);
+		run("Minimum...", "radius="+r2);
+	}
+	run("Fill Holes");
+	
+	// cut off small protrusions
+	getPixelSize(unit, dx, dy);
+	r3 = maxOf(1, round(100/dx));	
+	///for (i = 0; i < 5; i++) {
+	run("Minimum...", "radius="+r3);
+	run("Maximum...", "radius="+r3);	
+//	}
+	run("Minimum...", "radius="+r3/4);
+	run("Analyze Particles...", "size=100-Infinity add");
+	keepLargestROI();
+	
+	roiManager("select",0);
+	fixContourOrientation();	
+	//run("Interpolate", "interval="+50/dx+"  smooth adjust");
+	roiManager("add");
+	roiManager("select", 0);
+	roiManager("delete");
+	
+	selectImage(mask_id); close();
+	selectImage(preprocessed_id);
+	run("Select None");
+	getStatistics(area, mean, min, Imax, std, histogram);
+	run("Subtract...", "value="+ (Imax / 4));
+	run("Min...", "value=0");
+	
+	return preprocessed_id;
+}
+
+function mse(x0,y0,x1,y1) {
+	s = 0;
+	for (i = 0; i < x0.length; i++) {		
+		dmin = 1e6;
+		for (j = 0; j < x1.length; j++) {		
+			dx = x0[i] - x1[j];
+			dy = y0[i] - y1[j];
+			d = dx*dx+dy*dy;
+			if (d < dmin) {
+				dmin = d;
+			}
+		}
+		s += dmin;
+	}
+	return s / x.length;
+}
+
+function fitContour(id, max_iter) {
+	/* Fit the contours of the image id, update the ROI manager */		
+	print("Fit Contour");	
+	
+	selectImage(id);
+	getPixelSize(unit, dx, dy);	
+	
+	// Measure the maximum value of the edge image
+	run("Select None");
+	getStatistics(area, mean, min, Imax, std, histogram);
+	
+	// Interpolate the contour
+	roiManager("select", 0);		
+	run("Enlarge...", "enlarge=-2");
+	run("Interpolate", "interval="+50/dx+"  smooth adjust");
+	
+	// Retreive its coordinates and optimize the curve
+	Roi.getSplineAnchors(x, y);			
+	roiManager("delete");
+	
+	showStatus("Optimizing contour");
+	delta = 1;
+	
+	//setBatchMode("exit and display");	
+	//Roi.setPolygonSplineAnchors(x, y);
+	
+	x0 = Array.copy(x);
+	y0 = Array.copy(y);	
+	for (iter = 0; iter < max_iter && delta > 0.1; iter++) {
+		showProgress(iter, max_iter);				
+		delta = gradTheCurve(x, y, 50/dx, Imax);	
+		fftSmooth(x,y,5.);			
+		Roi.setPolygonSplineAnchors(x, y);
+		run("Interpolate", "interval="+50/dx+" ");
+		Roi.getSplineAnchors(x, y);	
+		delta = mse(x0,y0,x,y);
+		
+		x0 = Array.copy(x);
+		y0 = Array.copy(y);		
+	}
+	
+	print("Contour fitting finished in "+iter+" iterations.");
+	//setBatchMode("exit and display"); exit();
+	
+	// Update the ROI	
+	Roi.setPolygonSplineAnchors(x, y);
+	roiManager("add");	
+	//exit();
 }
 
 function initROI(id) {	
@@ -548,10 +607,13 @@ function keepLargestROI() {
 }
 
 function EMThreshold() {
-	// Fit a Gaussian mixture with 2 components using an expectation minimization algorithm
-	// to set a threshold
+	/* 
+	 *  Fit a Gaussian mixture with 2 components using an 
+	 * 	expectation minimization algorithm to define a threshold
+	 * 	
+	 */	
 	id = getImageID();	
-	N = getWidth()*getHeight();
+	N = getWidth() * getHeight();
 	getHistogram(values, counts, 255);	
 	n = values.length;
 	
@@ -601,18 +663,18 @@ function EMThreshold() {
 		a2 = a2 / N;		
 	}		
 	// likelihood test
+	t = mean + 3*std;
 	for (i = 0; i < values.length-1; i++) {
-		if (p1[i]>0.5&&p1[i+1]<0.5){
+		if (p1[i] > 0.5 && p1[i+1] <= 0.5){
 			t = values[i];
 		}
 	}
-	setThreshold(0,t);
+	setThreshold(t,max);
 }
 
 function gaussian1(x,a,m,s) {	
 	d = abs(x-m);
-	p = a * exp(-0.5*d*d/s) / sqrt(2*PI*s);
-	//if (p<0.00001) {p=0;}
+	p = a * exp(-0.5*d*d/s) / sqrt(2*PI*s);	
 	return p;
 }
 
@@ -627,110 +689,39 @@ function gradTheCurve(x,y,tmax,Imax) {
 		swx = 0;
 		sw = 0;		
 		m = 0;
+		maxval = 0;
+		xmax = x[i];
+		ymax = y[i];
 		for (k = 0; k < K; k++) {
 			t = -tmax + 2 * tmax * k / K;
 			xt = x[i] + t * dy[i] / n;
 			yt = y[i] - t * dx[i] / n;
 			I = getPixel(xt,yt);
+			if (I>maxval) {
+				maxval = I;
+				xmax = xt;
+				ymax = yt;
+			}
 			w = I * exp(-0.5*(t*t)/(tmax*tmax));
 			swx += w * t;
 			sw += w;
 			m++;
 		}
+		//x[i] = xmax;
+		//y[i] = ymax;
 		if (sw > 0) {			
 			tstar = swx / sw;
 			vx = tstar * dy[i] / n;
 			vy = - tstar * dx[i] / n;
-			V = sqrt(vx*vx+vy*vy);			
-			r = 1/(1+exp(-10*sw/Imax/m));
+			V = sqrt(vx*vx+vy*vy);	
+			r = 1 / ( 1 + exp(-20*sw/Imax/m));			
 			x[i] = x[i] + r*vx;
 			y[i] = y[i] + r*vy;					
 			delta = delta +  V;
 		}
+		Imax = maxval;
 	}	
 	return delta / x.length;
-}
-
-function segmentWeka(model) {	
-	/* Segment the image using a pixel classifier */
-	run("Duplicate...", " ");
-	run("Trainable Weka Segmentation");
-	wait(1000);
-	selectWindow("Trainable Weka Segmentation v3.3.2");
-	call("trainableSegmentation.Weka_Segmentation.loadClassifier", model);
-	call("trainableSegmentation.Weka_Segmentation.getResult");
-	selectWindow("Classified image");
-	selectWindow("Trainable Weka Segmentation v3.3.2");
-	close();
-	selectWindow("Classified image");
-	setThreshold(level-0.1, level+0.1);
-	run("Convert to Mask");
-	
-	run("Analyze Particles...", "size=0-Infinity add");
-	// keep the largest ROI
-	n = roiManager("count");
-	amax = 0;
-	istar = -1
-	for (i = 0; i < n; i++) {
-		roiManager("select",i);
-		a = getValue("Area");
-		if (a > amax) {
-			istar = i;
-			amax = a;
-		}
-	}
-	for (i = n-1; i >= 0; i--) {
-		roiManager("select",i);
-		if (i != istar) {
-			roiManager("delete");
-		}
-	}
-	close();
-	roiManager("select",0);
-	roiFftSmooth(0.1);	
-	selectImage(id0);
-}
-
-function segment_old() {
-	// Segment the organoid
-	run("Duplicate...","title=tmp");
-	selectWindow("tmp");
-	run("32-bit");
-	// preprocessing on a downsampled image
-	w = getWidth();
-	h = getHeight();
-	run("Size...", "width="+(w/8)+" height="+(h/8)+" depth=1 constrain average interpolation=Bilinear");
-	for (i = 0; i < 5; i++) {
-		run("Minimum...", "radius=1");
-		run("Maximum...", "radius=1");
-		run("Median...", "radius=1");
-	}
-	run("Subtract Background...", "rolling=100 light sliding");
-	run("Size...", "width="+w+" height="+h+" depth=1 constrain average interpolation=Bilinear");
-	// Otsu thresholding
-	getStatistics(area, mean, min, max, std, histogram);
-	setThreshold(min, mean-alpha*std);
-	run("Convert to Mask");
-	run("Fill Holes");
-	//makeOval(getWidth/8, getHeight()/8, 6/8*getWidth(), 6/8*getHeight());
-	run("Analyze Particles...", "size=0-Infinity add");
-	roiManager("select",0);
-	roiFftSmooth(0.1);
-	roiManager("update");
-	close();
-}
-
-function substractBackground() {
-	w = getWidth();
-	h = getHeight();
-	run("Size...", "width="+(w/8)+" height="+(h/8)+" depth=1 constrain average interpolation=Bilinear");
-	for (i = 0; i < 5; i++) {
-		run("Minimum...", "radius=1");
-		run("Maximum...", "radius=1");
-		run("Median...", "radius=1");
-	}
-	run("Subtract Background...", "rolling=100 light sliding");
-	run("Size...", "width="+w+" height="+h+" depth=1 constrain average interpolation=Bilinear");
 }
 
 function measureIntensityOutside(id) {
@@ -740,8 +731,9 @@ function measureIntensityOutside(id) {
 	 * to avoid taking into account regions from inside the organoid. return the mean intensity
 	 */
 	selectImage(id);	
+	run("Select None");
 	setAutoThreshold("Minimum dark");
-	run("Create Selection");
+	run("Create Selection");	
 	run("Enlarge...", "enlarge=-50");
 	val = getValue("Mean");
 	run("Select None");	
@@ -761,20 +753,6 @@ function transparency() {
 	return v;
 }
 
-function removeScaleBar() {
-	/* Remove the scalebar that was saved onto the image pixels */
-	a0 = getValue("Area");
-	setThreshold(255, 255);	
-	run("Create Selection");
-	if (getValue("Area")!=a0) {
-		if (getValue("Area") != getWidth() * getHeight()) {
-			run("Enlarge...", "enlarge=2");
-			run("Median...", "radius=10");
-			run("Select None");
-		}
-	}
-}
-
 function getContourInflectionPoints(curvature,r0) {
 	// return list of index where the curvature is more than 2 time the minor axis.
 	//r0 = getValue("Major");
@@ -791,7 +769,7 @@ function getContourInflectionPoints(curvature,r0) {
 	}	
 	
 	id = getImageID();
-	
+	/*
 	Plot.create("Title", "X","Y");
 	Plot.add("line", Array.getSequence(curvature.length), curvature);
 	Plot.setColor("green");
@@ -802,6 +780,7 @@ function getContourInflectionPoints(curvature,r0) {
 	Plot.add("line",xl,yl);
 	Plot.add("circle",xp,yp);
 	Plot.update();
+	*/
 	selectImage(id);
 	
 	return inflx;
@@ -834,8 +813,7 @@ function getCircBB(n,i) {
 }
 
 function getCurvilinearLength(x,y,pixel_size) {
-	// return the distance between consecutive points using circular boundary conditions
-	print("Computing curvilinear length with pixel size " + pixel_size);
+	// return the distance between consecutive points using circular boundary conditions	
 	s = newArray(x.length);	
 	for (i = 0; i < x.length-1; i++) {
 		dx = x[i+1] - x[i];
@@ -892,6 +870,8 @@ function DND(x,y,pixel_size) {
 	return e;
 }
 
+/* Display of contours with color coding */
+
 function colorContour(x,y,value,width) {
 	// color the contour with value as overlay
 	lut = getLutHexCodes("Ice");		
@@ -939,6 +919,7 @@ function dec2hex(n) {
 	return codes[k1]+codes[k2]; 
 }
 
+/* Contour curvature */
 
 function getAverageRadius(x,y,pixel_size) {
 	/* compute the average radius of the polygone defined by x,y */
@@ -973,10 +954,11 @@ function getContourCurvatureGeo(x,y,pixel_size) {
 }
 
 function curvHelper(x0,y0,x1,y1,x2,y2) {
-	// Use Heron formula to compute curvature
-	// as the radius of the osculating circle
-	// using a geometric approach
-	//  https://scholar.rose-hulman.edu/cgi/viewcontent.cgi?article=1233&context=rhumj
+	/* Use Heron formula to compute curvature
+	 as the radius of the osculating circle
+	 using a geometric approach
+	 https://scholar.rose-hulman.edu/cgi/viewcontent.cgi?article=1233&context=rhumj
+	*/
 	xa = x0 - x1;
 	ya = y0 - y1;
 	
@@ -998,9 +980,7 @@ function curvHelper(x0,y0,x1,y1,x2,y2) {
 
 
 function getContourCurvature(x,y) {
-	// Compute cuvature with periodic boundary conditions	
-	//x = smooth1d(x,2);
-	//y = smooth1d(y,2);
+	/* Compute cuvature with periodic boundary conditions */
 	n = x.length;
 	gamma = newArray(n);
 	for (i = 1; i < n-1; i++) {
@@ -1025,8 +1005,8 @@ function getContourCurvature(x,y) {
 	return gamma;
 }
 
-
 function diff(u) {
+	/* First derivatives with periodic bounday conditions */
 	n = u.length;
 	d = newArray(n);
 	for (i = 0; i < n - 1; i++) {
@@ -1037,6 +1017,7 @@ function diff(u) {
 }
 
 function diff2(u) {
+	/* Second derivatives with periodic bounday conditions */
 	n = u.length;
 	d = newArray(n);
 	for (i = 1; i < n-1; i++) {
@@ -1047,24 +1028,20 @@ function diff2(u) {
 	return d; 
 }
 
-function roiFractalDimension(x,y,doplot) {
-	// Compute the fractal dimension of the contour
-	// should be between 1 and 2..
-	// https://arxiv.org/abs/1201.3097
-	//run("Interpolate", "interval=1");
-	//Roi.getCoordinates(x, y);	
-	if (x.length > 10) {	
-		if (0) {
-		Array.getStatistics(x, xmin, xmax, xmean, xstdDev);
-		Array.getStatistics(y, ymin, ymax, ymean, ystdDev);	
-		for (i = 0; i < x.length; i++) {
-			x[i]=(x[i]-xmean)/xstdDev;
-			y[i]=(y[i]-ymean)/ystdDev;
-		}
-	}
-	if (doplot==true) {
+/* FFT */
+
+function roiFractalDimension(x, y, doplot) {
+	/* Compute the fractal dimension of the contour
+	 * should be between 1 and 2..
+	 * https://arxiv.org/abs/1201.3097		
+	 */
+	 		
+	if (x.length < 8) return 1.0;
+			
+	if (doplot == true) {
 		Plot.create("curve","x","y",x,y);
 	}
+	
 	m = powerspectrum(x, y);
 	
 	f = newArray(m.length-1);
@@ -1073,24 +1050,22 @@ function roiFractalDimension(x,y,doplot) {
 		f[i] = log(i+1);
 		mf[i] = log(m[i+1]);
 	}
-	if (doplot==true) {
-		Plot.create("curve","x","y",f,mf);
+	
+	if (doplot == true) {
+		Plot.create("power spectrum","k","psd",f,mf);
 	}
+	
 	Fit.doFit("Straight Line", f, mf);
-	if (doplot==true) {
+	if (doplot == true) {
 		Fit.plot;
 	}
+	
 	beta = Fit.p(1);
-	return 1-(beta + 2) / 6;
-	}
-	return 1.0;
+	return 1-(beta + 2) / 6;	
 }
 
-/*
- * Log powerspectrum
- */
 function powerspectrum(_real,_imag) {
-	//print(_real.length);	
+	/* Log power spectrum*/
 	N = nextPowerOfTwo(_real.length);
 	//print(N);
 	real = Array.resample(_real,N);
@@ -1114,30 +1089,27 @@ function roiFftSmooth(_threshold) {
 	setColor("green");
 	//makeSelection("freehand", x, y);
 	Roi.setPolygonSplineAnchors(x, y);
-	run("Interpolate", "interval=1 smooth adjust");
+	run("Interpolate", "interval=10 smooth adjust");
 }
 
 function fftSmooth(_real,_imag,_threshold) {
 	//  Smoothing by Fourier coefficient hard thresholding
-	N = nextPowerOfTwo(_real.length);
-	real = Array.resample(_real,N);
-	imag = Array.resample(_imag,N);
+	N = nextPowerOfTwo(_real.length);	
+	real = padarray(_real,N);
+	imag = padarray(_imag,N);
 	fft(real,imag);	
 	for (i = 2; i < real.length; i++) {
-		m = sqrt(real[i]*real[i]+imag[i]*imag[i]);
+		m = sqrt(real[i]*real[i]+imag[i]*imag[i]);	
 		if (m < _threshold*_real.length) {
 			real[i] = 0;
 			imag[i] = 0;
-		}
+		} 
 	}	
-	ifft(real,imag);
-	real = Array.resample(real,_real.length);
-	imag = Array.resample(imag,_real.length);
-	for (i = 0; i < real.length; i++) {
+	ifft(real,imag);	
+	for (i = 0; i < _real.length; i++) {
 		_real[i] = real[i];
 		_imag[i] = imag[i];
-	}
-	//Plot.create("","","",_real,_imag);
+	}		
 }
 
 function nextPowerOfTwo(_N) {
@@ -1156,7 +1128,6 @@ function padarray(_src,_N) {
 		dest=_src;
 	}
 	return dest;
-	
 }
 
 function fft(_real,_imag) {
@@ -1221,6 +1192,7 @@ function separate(a, p, n) {
 }
 
 /*** END oF FFT **/
+
 function smooth1d(src,sigma) {
 	n = src.length;
 	dst = newArray(n);	
@@ -1240,15 +1212,31 @@ function smooth1d(src,sigma) {
 }
 
 function closeRoiManager() {
+	/* Empty the ROI manager and close it*/
 	while (roiManager("count")>0) {roiManager("select", roiManager("count")-1);roiManager("delete");}
-	closeWindow("ROI Manager");
+	close("ROI Manager");
 	run("Select None");
 }
 
-
-function closeWindow(name){
-	if (isOpen(name)){
-		selectWindow(name);
-		run("Close");
+function main() {
+	/* entry point */
+	if (!endsWith(filename,".tif")) {
+		exit();
 	}
+	start_time = getTime();
+	run("Close All");
+	run("Set Measurements...", "  redirect=None decimal=10");
+	closeRoiManager();
+	print("-------------------------------------------------");
+	print(filename);
+	folder = File.getDirectory(filename);
+	fname = File.getName(filename);
+	tbl = "Organoid Morphology";
+	n = initTable(tbl);
+	processFile(n, folder, fname, tbl);	
+	run("Collect Garbage");	
+	end_time = getTime();
+	print("Elapsed time " + (end_time - start_time) / 1000 + " seconds.");
 }
+
+main();
